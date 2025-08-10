@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Split That Sh*t — Simple Bill Splitter</title>
+
+<!-- Inter font (only external dep) -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg: #f6f7fb;
+    --card: #ffffff;
+    --ink: #0f172a;            /* slate-900 */
+    --muted: #6b7280;          /* gray-500 */
+    --ring: #d4d8e2;
+    --focus: #a5b4fc;          /* indigo-300 */
+    --accent: #96e6d9;         /* calm gradient like screenshot */
+    --accent-2: #b8c7ff;
+    --shadow: 0 10px 30px rgba(15, 23, 42, .07);
+    --radius: 22px;
+    --gap: 18px;
+    --thumb: 56px;
+    --speed: .18s;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    color:var(--ink);
+    background:
+      radial-gradient(1200px 400px at 100% 0%, #e7f7f4 0%, rgba(231,247,244,0) 70%),
+      linear-gradient(#f8fafc,#f6f7fb 40%);
+    background-color: var(--bg);
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+  }
+
+  /* Top app header */
+  .topbar{
+    position: sticky; top:0; z-index:10;
+    backdrop-filter: saturate(1.1) blur(6px);
+    background: rgba(246,247,251,.6);
+    border-bottom: 1px solid #eef1f6;
+  }
+  .topbar-inner{ max-width: 1100px; margin: 0 auto; padding: 14px 20px; display:flex; align-items:center; gap:12px; }
+  .app-icon{ width:28px; height:28px; border-radius:8px; display:grid; place-items:center; box-shadow: 0 6px 18px rgba(15,23,42,.1) inset, 0 2px 6px rgba(15,23,42,.08); background: radial-gradient(65% 65% at 35% 30%, var(--accent) 0%, var(--accent-2) 100%); }
+  .app-dot{ width:16px; height:16px; border-radius:999px; background: radial-gradient(60% 60% at 40% 40%, rgba(255,255,255,.35) 0%, rgba(255,255,255,.0) 100%),
+             radial-gradient(60% 60% at 60% 60%, rgba(0,0,0,.08) 0%, rgba(0,0,0,0) 70%); }
+  .brand{ font-weight:700; letter-spacing:-.01em; }
+
+  .wrap{
+    max-width: 920px;
+    margin: 18px auto 64px;
+    padding: clamp(12px, 2vw, 24px);
+  }
+
+  /* Hero */
+  .hero{
+    background: var(--card);
+    border-radius: 28px;
+    box-shadow: var(--shadow);
+    padding: clamp(20px, 5vw, 42px);
+    position: relative;
+    overflow:hidden;
+  }
+  .hero::after{
+    content:"";
+    position:absolute;
+    inset:auto auto -140px -140px;
+    width:340px;height:340px;border-radius:50%;
+    background: radial-gradient(60% 60% at 40% 40%, var(--accent) 0%, var(--accent-2) 100%);
+    filter: blur(10px);
+    opacity:.55;
+  }
+  .title{
+    margin: 0 0 6px 0;
+    font-weight: 800;
+    font-size: clamp(28px, 5.2vw, 56px);
+    letter-spacing:-0.02em;
+  }
+  .subtitle{
+    margin:0;
+    color:var(--muted);
+    font-size: clamp(14px, 2.6vw, 18px);
+  }
+
+  /* Card layout */
+  .card{
+    background:var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: clamp(16px, 3.5vw, 28px);
+  }
+  .grid{
+    display:grid;
+    grid-template-columns: 1fr;
+    gap: var(--gap);
+    margin-top: var(--gap);
+  }
+  @media (min-width: 900px){
+    .grid{ grid-template-columns: 1.2fr .8fr; }
+  }
+
+  /* Inputs area */
+  .stack{ display:grid; gap: var(--gap); }
+
+  .field{
+    display:flex; align-items:center; justify-content:space-between;
+    background:#f8fafc;
+    border: 1px solid #eef1f6;
+    border-radius: 18px;
+    padding: 14px 16px;
+    transition: border-color var(--speed), box-shadow var(--speed), background var(--speed);
+  }
+  .field:focus-within{
+    border-color: var(--focus);
+    box-shadow: 0 0 0 4px rgba(165,180,252,.25);
+    background:#ffffff;
+  }
+  .label{
+    font-size:14px; color:var(--muted); margin-right:10px; white-space:nowrap;
+  }
+  .money{
+    flex:1; text-align:right; font-weight:700;
+    font-size: clamp(28px, 7vw, 44px);
+    letter-spacing:-0.02em;
+    border:0; background:transparent; outline:0; width:100%;
+  }
+  .icon-btn{
+    border:1px solid #e5e7eb; background:#fff; border-radius:16px;
+    padding:10px 14px; font-weight:600; cursor:pointer;
+    transition: transform var(--speed), box-shadow var(--speed), background var(--speed);
+    box-shadow: var(--shadow);
+  }
+  .icon-btn:hover{ transform: translateY(-1px); }
+  .icon-btn:active{ transform: translateY(0); }
+  .qty{
+    display:flex; gap:8px; align-items:center;
+  }
+  .qty .count{
+    min-width:56px; text-align:center;
+    font-weight:700; font-size:22px;
+  }
+
+  /* Tip buttons */
+  .tip-row{
+    display:grid; grid-template-columns: repeat(5, 1fr); gap:10px;
+  }
+  .tip-btn{
+    border:1px solid #e5e7eb; background:#fff; border-radius:14px; height:48px;
+    font-weight:600; cursor:pointer; transition: border-color var(--speed), box-shadow var(--speed), background var(--speed), transform var(--speed);
+    box-shadow: var(--shadow);
+  }
+  .tip-btn[aria-pressed="true"]{
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-color: transparent; color:#0b1020;
+  }
+  .tip-btn:hover{ transform: translateY(-1px); }
+  .custom-wrap{ display:none; }
+  .tip-btn.custom[aria-pressed="true"] ~ .custom-wrap{ display:block; }
+
+  .percent-input{
+    width:100%; height:48px; border:1px solid #e5e7eb; border-radius:14px; padding:0 14px;
+    font-weight:600; text-align:right;
+  }
+  .percent-input:focus{ outline: none; border-color:var(--focus); box-shadow:0 0 0 4px rgba(165,180,252,.25); }
+
+  /* Collapsible tax */
+  .disclosure{
+    border:1px dashed #e5e7eb; background:#fcfdff; border-radius:14px; padding:12px 14px;
+  }
+  details { user-select:none; }
+  summary{ cursor:pointer; list-style:none; display:flex; align-items:center; gap:10px; color:var(--muted); }
+  summary::-webkit-details-marker{display:none}
+  .chev{ transition: transform var(--speed); }
+  details[open] .chev{ transform: rotate(90deg); }
+  .tax-row{ display:flex; align-items:center; gap:12px; margin-top:10px; }
+
+  /* Results (right column) */
+  .results{ display:grid; gap:12px; align-content:start; }
+  .result{
+    display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #eef1f6; border-radius:16px; padding:14px 16px;
+  }
+  .result .name{ color:#64748b; font-size:14px; }
+  .result .value{ font-weight:700; font-size: clamp(22px, 5vw, 28px); letter-spacing:-0.01em; transition: opacity var(--speed); }
+  .result.fade{ opacity: .35; }
+
+  .big-total{ text-align:center; padding: 22px 16px 8px; }
+  .big-total .hint{ color:var(--muted); font-size:13px; }
+  .big-num{ font-weight:800; font-size: clamp(36px, 9vw, 64px); letter-spacing:-0.02em; line-height:1.1; margin: 2px 0 4px; }
+
+  /* Controls row */
+  .row{ display:flex; gap:10px; flex-wrap:wrap; }
+  select, .seg{ height:44px; border-radius:14px; border:1px solid #e5e7eb; background:#fff; padding:0 12px; font-weight:600; box-shadow: var(--shadow); }
+  select{ cursor:pointer; }
+  .seg{ display:flex; overflow:hidden; }
+  .seg button{ height:100%; padding:0 12px; border:0; background:transparent; cursor:pointer; font-weight:600; }
+  .seg button[aria-pressed="true"]{ background:#eef2ff; }
+  .share{ margin-left:auto; display:flex; align-items:center; gap:8px; border:0; background:#111827; color:#fff; height:44px; padding:0 14px; border-radius:14px; cursor:pointer; transition: transform var(--speed), opacity var(--speed); }
+  .share:active{ transform: translateY(1px); }
+
+  /* Footer */
+  .site-footer{ margin: 56px auto 22px; text-align:center; color:#6b7280; font-size:13px; }
+  .site-footer .pill{ display:inline-flex; align-items:center; gap:8px; border:1px solid #e5e7eb; background:#fff; padding:10px 14px; border-radius:999px; box-shadow: var(--shadow); }
+  .site-footer .pill .spark{ font-size:14px; }
+
+  /* Little helpers */
+  .sr{ position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden; }
+  .mono{ font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+  <!-- App-style top header -->
+  <div class="topbar" role="banner">
+    <div class="topbar-inner">
+      <div class="app-icon" aria-hidden="true"><div class="app-dot"></div></div>
+      <div class="brand" aria-label="App name">Bill Split</div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <header class="hero">
+      <h1 class="title">Split your bill</h1>
+      <p class="subtitle">No account. No clutter. Split that sh*t anywhere.</p>
+    </header>
+
+    <section class="grid">
+      <!-- Left: Inputs -->
+      <div class="card stack" aria-labelledby="inputs">
+        <h2 id="inputs" class="sr">Inputs</h2>
+
+        <!-- Bill Amount -->
+        <label class="field" aria-label="Bill amount">
+          <span class="label">Bill</span>
+          <input id="bill" class="money mono" inputmode="decimal" autocomplete="off" placeholder="$ 0.00" />
+        </label>
+
+        <!-- People -->
+        <div class="field" role="group" aria-label="Number of people">
+          <span class="label">People</span>
+          <div class="qty">
+            <button class="icon-btn" id="minus" aria-label="Decrease people">–</button>
+            <div class="count mono" id="peopleCount" aria-live="polite">1</div>
+            <button class="icon-btn" id="plus" aria-label="Increase people">+</button>
+          </div>
+        </div>
+
+        <!-- Tip -->
+        <div class="stack">
+          <div class="label" style="padding-left:2px">Tip</div>
+          <div class="tip-row" role="tablist" aria-label="Tip percent">
+            <button class="tip-btn" data-tip="0">0%</button>
+            <button class="tip-btn" data-tip="10">10%</button>
+            <button class="tip-btn" data-tip="15">15%</button>
+            <button class="tip-btn" data-tip="20">20%</button>
+            <button class="tip-btn custom" id="tipCustomBtn" aria-controls="customTip">Custom</button>
+            <div class="custom-wrap" style="grid-column: 1 / -1;">
+              <input id="customTip" class="percent-input mono" inputmode="decimal" placeholder="Custom tip %">
+            </div>
+          </div>
+        </div>
+
+        <!-- Optional tax -->
+        <details id="taxDisclosure" class="disclosure">
+          <summary><span class="chev">›</span> Optional tax</summary>
+          <div class="tax-row">
+            <label class="sr" for="taxPct">Tax percent</label>
+            <input id="taxPct" class="percent-input mono" inputmode="decimal" placeholder="Tax % (e.g. 8.875)">
+          </div>
+        </details>
+
+        <!-- Footer controls -->
+        <div class="row">
+          <label class="sr" for="currency">Currency</label>
+          <select id="currency" aria-label="Currency">
+            <option value="USD" selected>USD $</option>
+            <option value="EUR">EUR €</option>
+            <option value="GBP">GBP £</option>
+            <option value="JPY">JPY ¥</option>
+            <option value="AUD">AUD $</option>
+            <option value="CAD">CAD $</option>
+            <option value="INR">INR ₹</option>
+          </select>
+
+          <div class="seg" role="tablist" aria-label="Rounding">
+            <button id="round-down" aria-pressed="false">↓ Down</button>
+            <button id="round-nearest" aria-pressed="true">≈ Nearest</button>
+            <button id="round-up" aria-pressed="false">↑ Up</button>
+          </div>
+
+          <button class="share" id="shareBtn" title="Copy breakdown">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M8 7h8m-8 5h8m-8 5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Share
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: Results -->
+      <div class="card results" aria-live="polite">
+        <div class="big-total">
+          <div class="hint">Each person pays</div>
+          <div class="big-num mono" id="perPerson">$0.00</div>
+        </div>
+        <div class="result">
+          <div class="name">Tip (total)</div>
+          <div class="value mono" id="tipTotal">$0.00</div>
+        </div>
+        <div class="result">
+          <div class="name">Tax (total)</div>
+          <div class="value mono" id="taxTotal">$0.00</div>
+        </div>
+        <div class="result">
+          <div class="name">Total with tip + tax</div>
+          <div class="value mono" id="grandTotal">$0.00</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Site Footer -->
+    <footer class="site-footer" role="contentinfo">
+      <div class="pill">
+        <span>&copy; <span id="dynYear"></span> Super Nice Tools</span>
+        <span class="spark" aria-hidden="true">✨</span>
+      </div>
+    </footer>
+  </div>
+
+<script>
+(() => {
+  // --- Currency data
+  const CURRENCIES = {
+    USD:{code:"USD", symbol:"$", digits:2, locale:"en-US"},
+    EUR:{code:"EUR", symbol:"€", digits:2, locale:"de-DE"},
+    GBP:{code:"GBP", symbol:"£", digits:2, locale:"en-GB"},
+    JPY:{code:"JPY", symbol:"¥", digits:0, locale:"ja-JP"},
+    AUD:{code:"AUD", symbol:"$", digits:2, locale:"en-AU"},
+    CAD:{code:"CAD", symbol:"$", digits:2, locale:"en-CA"},
+    INR:{code:"INR", symbol:"₹", digits:2, locale:"en-IN"}
+  };
+
+  // --- Elements
+  const billEl = document.getElementById('bill');
+  const minus = document.getElementById('minus');
+  const plus = document.getElementById('plus');
+  const peopleCount = document.getElementById('peopleCount');
+  const tipButtons = [...document.querySelectorAll('.tip-btn')];
+  const tipCustomBtn = document.getElementById('tipCustomBtn');
+  const customTipEl = document.getElementById('customTip');
+  const taxPctEl = document.getElementById('taxPct');
+  const perPersonEl = document.getElementById('perPerson');
+  const tipTotalEl = document.getElementById('tipTotal');
+  const taxTotalEl = document.getElementById('taxTotal');
+  const grandTotalEl = document.getElementById('grandTotal');
+  const currencyEl = document.getElementById('currency');
+  const shareBtn = document.getElementById('shareBtn');
+  const roundDown = document.getElementById('round-down');
+  const roundNearest = document.getElementById('round-nearest');
+  const roundUp = document.getElementById('round-up');
+
+  // Dynamic copyright year
+  const yr = document.getElementById('dynYear');
+  if(yr) yr.textContent = new Date().getFullYear();
+
+  // --- State
+  const state = {
+    currency: localStorage.getItem('split.currency') || 'USD',
+    tipPct: parseFloat(localStorage.getItem('split.tipPct') || '15'),
+    customTip: '',
+    taxPct: '',
+    people: 1,
+    rounding: 'nearest',
+    amount: 0
+  };
+
+  // --- Helpers
+  const nf = () => new Intl.NumberFormat(CURRENCIES[state.currency].locale, {
+    style:"currency",
+    currency: state.currency,
+    minimumFractionDigits: CURRENCIES[state.currency].digits,
+    maximumFractionDigits: CURRENCIES[state.currency].digits
+  });
+
+  function parseMoneyInput(v){
+    const d = CURRENCIES[state.currency].digits;
+    v = (v || '').toString().replace(/[^0-9.,]/g,'').replace(',', '.');
+    if(!v){ return 0; }
+    const num = Number(v);
+    return isNaN(num) ? 0 : num;
+  }
+
+  function formatMoneyInput(num){
+    const d = CURRENCIES[state.currency].digits;
+    return nf().format(num || 0);
+  }
+
+  // Animate numbers smoothly
+  function animateTo(el, target){
+    const prev = parseFloat(el.dataset.value || '0');
+    const duration = 280;
+    const start = performance.now();
+    function step(now){
+      const t = Math.min(1, (now - start)/duration);
+      const eased = t<.5 ? 2*t*t : -1 + (4 - 2*t)*t; // easeInOutQuad
+      const val = prev + (target - prev) * eased;
+      el.textContent = nf().format(val);
+      if(t < 1) requestAnimationFrame(step);
+      else el.dataset.value = String(target);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function roundAmount(x){
+    const digits = CURRENCIES[state.currency].digits;
+    const factor = Math.pow(10, digits);
+    if(state.rounding === 'up')   return Math.ceil(x * factor)/factor;
+    if(state.rounding === 'down') return Math.floor(x * factor)/factor;
+    return Math.round(x * factor)/factor; // nearest
+  }
+
+  function selectedTipPct(){
+    const pressed = tipButtons.find(b => b.getAttribute('aria-pressed') === 'true');
+    if(pressed?.dataset.tip !== undefined){
+      return parseFloat(pressed.dataset.tip) || 0;
+    }
+    const custom = parseFloat(customTipEl.value);
+    return isNaN(custom) ? 0 : custom;
+  }
+
+  function setTipPressed(btn){
+    tipButtons.forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+    const isCustom = btn === tipCustomBtn;
+    document.querySelector('.custom-wrap').style.display = isCustom ? 'block' : 'none';
+    if(!isCustom){ customTipEl.value = ''; }
+  }
+
+  // Core calc
+  function compute(){
+    const amountRaw = parseMoneyInput(billEl.value);
+    state.amount = amountRaw;
+
+    state.taxPct = parseFloat(taxPctEl.value) || 0;
+    state.tipPct = selectedTipPct();
+    state.people = Math.max(1, parseInt(peopleCount.textContent,10) || 1);
+
+    // Remember prefs
+    localStorage.setItem('split.tipPct', String(state.tipPct));
+    localStorage.setItem('split.currency', state.currency);
+
+    const tax = amountRaw * (state.taxPct/100);
+    const tipBase = amountRaw + tax;
+    const tip = tipBase * (state.tipPct/100);
+    const grand = amountRaw + tax + tip;
+
+    const per = roundAmount(grand / state.people);
+
+    animateTo(taxTotalEl, tax);
+    animateTo(tipTotalEl, tip);
+    animateTo(grandTotalEl, grand);
+    animateTo(perPersonEl, per);
+  }
+
+  // --- Wire up
+
+  // Set defaults from storage
+  currencyEl.value = state.currency;
+  // Tip default (match storage or 15)
+  const defaultTipBtn = tipButtons.find(b => Number(b.dataset.tip) === Math.round(state.tipPct));
+  setTipPressed(defaultTipBtn || tipCustomBtn);
+  if(!defaultTipBtn){ customTipEl.value = state.tipPct; }
+
+  // Currency change reformat inputs + outputs
+  currencyEl.addEventListener('change', () => {
+    state.currency = currencyEl.value;
+    billEl.value = formatMoneyInput(parseMoneyInput(billEl.value));
+    compute();
+  });
+
+  // Bill input
+  billEl.addEventListener('input', () => { compute(); });
+  billEl.addEventListener('blur', () => { billEl.value = formatMoneyInput(parseMoneyInput(billEl.value)); });
+  billEl.addEventListener('focus', () => {
+    const n = parseMoneyInput(billEl.value);
+    billEl.value = (CURRENCIES[state.currency].digits === 0) ? String(Math.round(n)) : String(n.toFixed(2));
+    billEl.select();
+  });
+
+  // People
+  function setPeople(n){ n = Math.min(99, Math.max(1, n)); peopleCount.textContent = String(n); compute(); }
+  plus.addEventListener('click', ()=> setPeople(parseInt(peopleCount.textContent,10)+1));
+  minus.addEventListener('click',()=> setPeople(parseInt(peopleCount.textContent,10)-1));
+
+  // Tip buttons
+  tipButtons.forEach(btn=>{ btn.addEventListener('click', ()=>{ setTipPressed(btn); compute(); }); });
+  customTipEl.addEventListener('input', compute);
+
+  // Tax
+  taxPctEl.addEventListener('input', compute);
+
+  // Rounding segmented control
+  function setRounding(which){ state.rounding = which; roundDown.setAttribute('aria-pressed', which==='down'); roundNearest.setAttribute('aria-pressed', which==='nearest'); roundUp.setAttribute('aria-pressed', which==='up'); compute(); }
+  roundDown.addEventListener('click', ()=> setRounding('down'));
+  roundNearest.addEventListener('click', ()=> setRounding('nearest'));
+  roundUp.addEventListener('click', ()=> setRounding('up'));
+
+  // Share
+  shareBtn.addEventListener('click', async ()=>{
+    const cur = CURRENCIES[state.currency];
+    const fmt = nf();
+    const amount = parseMoneyInput(billEl.value);
+    const taxPct = parseFloat(taxPctEl.value) || 0;
+    const tipPct = selectedTipPct();
+    const tax = amount * (taxPct/100);
+    const tip = (amount + tax) * (tipPct/100);
+    const grand = amount + tax + tip;
+    const per = roundAmount(grand / state.people);
+
+    const text =
+`Bill Split
+-------------------------
+Bill:           ${fmt.format(amount)}
+Tax (${taxPct}%):   ${fmt.format(tax)}
+Tip (${tipPct}%):   ${fmt.format(tip)}
+People:         ${state.people}
+Rounding:       ${state.rounding}
+-------------------------
+Total:          ${fmt.format(grand)}
+Each pays:      ${fmt.format(per)} (${cur.code})
+`;
+    try{
+      await navigator.clipboard.writeText(text);
+      shareBtn.style.opacity = .8;
+      shareBtn.textContent = 'Copied!';
+      setTimeout(()=>{ shareBtn.style.opacity=1; shareBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 7h8m-8 5h8m-8 5h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Share'; }, 1200);
+    }catch(e){
+      alert('Copy failed. Your browser may block clipboard access.');
+    }
+  });
+
+  // Keyboard niceties
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'ArrowUp'){ setPeople(parseInt(peopleCount.textContent,10)+1); }
+    if(e.key === 'ArrowDown'){ setPeople(parseInt(peopleCount.textContent,10)-1); }
+  });
+
+  // Initial render
+  billEl.value = formatMoneyInput(0);
+  compute();
+})();
+</script>
+</body>
+</html>
